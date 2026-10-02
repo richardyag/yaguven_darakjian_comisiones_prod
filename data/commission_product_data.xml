@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Generic service line for the commission-payout Purchase Order. Not stock-tracked
+         on purpose: a commission payout is not a thing to receive into inventory. -->
+    <record id="product_commission_payout" model="product.product">
+        <field name="name">Sales Commission Payout</field>
+        <field name="type">service</field>
+        <field name="purchase_ok">True</field>
+        <field name="sale_ok">False</field>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+    </record>
+</odoo>

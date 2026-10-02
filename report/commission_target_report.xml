@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_commission_target_document">
+        <t t-call="web.external_layout">
+            <t t-foreach="docs" t-as="o">
+                <div class="page">
+                    <h2>
+                        Sales Commission — <t t-esc="o.salesperson_id.name"/>
+                    </h2>
+                    <h4>
+                        <t t-esc="dict(o._fields['month'].selection).get(o.month)"/> <t t-esc="o.year"/>
+                    </h4>
+
+                    <table class="table table-sm o_main_table mt-4">
+                        <tbody>
+                            <tr>
+                                <td><strong>Goal (USD)</strong></td>
+                                <td class="text-end"><span t-esc="o.objective_usd" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Billed Volume</strong></td>
+                                <td class="text-end"><span t-esc="o.volume_total" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tier Reached</strong></td>
+                                <td class="text-end"><span t-esc="dict(o._fields['tier'].selection).get(o.tier)"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Rate Applied</strong></td>
+                                <td class="text-end"><span t-esc="o.pct"/>%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Total Margin</strong></td>
+                                <td class="text-end"><span t-esc="o.margin_total" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                            <tr class="border-top">
+                                <td><strong>Commission Earned</strong></td>
+                                <td class="text-end"><span t-esc="o.commission_earned" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Commission Collected (payable now)</strong></td>
+                                <td class="text-end"><span t-esc="o.commission_collected" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pending Collection</strong></td>
+                                <td class="text-end"><span t-esc="o.commission_pending" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4 class="mt-4">Detail by Invoice</h4>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Date</th>
+                                <th class="text-end">Volume</th>
+                                <th class="text-end">Margin</th>
+                                <th class="text-end">Commission</th>
+                                <th class="text-center">Collected</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.line_ids" t-as="line">
+                                <td><span t-esc="line.move_name"/></td>
+                                <td><span t-esc="line.invoice_date"/></td>
+                                <td class="text-end"><span t-esc="line.volume" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                <td class="text-end"><span t-esc="line.margin" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                <td class="text-end"><span t-esc="line.commission_amount" t-options="{'widget': 'monetary', 'display_currency': o.currency_id}"/></td>
+                                <td class="text-center"><span t-esc="'Yes' if line.is_collected else 'No'"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <p t-if="o.purchase_order_id" class="mt-4 text-muted">
+                        Payout Purchase Order: <span t-esc="o.purchase_order_id.name"/>
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_commission_target" model="ir.actions.report">
+        <field name="name">Sales Commission Report</field>
+        <field name="model">yaguven.commission.target</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">yaguven_darakjian_comisiones.report_commission_target_document</field>
+        <field name="report_file">yaguven_darakjian_comisiones.report_commission_target_document</field>
+        <field name="print_report_name">'Commission - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_yaguven_commission_target"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>

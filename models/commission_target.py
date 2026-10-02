@@ -3,7 +3,7 @@ import re
 from datetime import date
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 # Bracketed code at the start of a line name: "[DRNG.00085629] LAB GROWN ..."
 CODE_RE = re.compile(r'^\s*\[([^\]]+)\]')
@@ -121,6 +121,17 @@ class YaguvenCommissionTarget(models.Model):
         store=True,
     )
     last_recompute = fields.Datetime(string='Last Recompute', readonly=True)
+
+    purchase_order_id = fields.Many2one(
+        'purchase.order',
+        string='Payout Purchase Order',
+        readonly=True,
+        copy=False,
+        help='Created by "Create Purchase Order" below, for the Commission Collected '
+             'amount only (what is actually payable today - not Commission Earned, '
+             'which still includes margin tied to invoices the customer has not paid '
+             'yet).',
+    )
 
     _sql_constraints = [
         (
@@ -300,6 +311,68 @@ class YaguvenCommissionTarget(models.Model):
     def action_recompute(self):
         self.with_context(skip_commission_recompute=True)._recompute()
         return True
+
+    # ------------------------------------------------------------------
+    # Print / payout
+    # ------------------------------------------------------------------
+    def action_print_report(self):
+        return self.env.ref(
+            'yaguven_darakjian_comisiones.action_report_commission_target'
+        ).report_action(self)
+
+    def _get_commission_payout_product(self):
+        return self.env.ref('yaguven_darakjian_comisiones.product_commission_payout')
+
+    def action_create_purchase_order(self):
+        """Create (once) a Purchase Order against the salesperson for Commission
+        Collected - the portion of the commission that is actually payable today,
+        because the underlying invoice has been collected. Commission Earned is
+        deliberately NOT used here: it still includes margin tied to invoices the
+        customer has not paid yet, which is not owed out of pocket until it is.
+
+        Idempotent: a second click on an already-paid-out target reopens the existing
+        PO instead of creating a duplicate.
+        """
+        self.ensure_one()
+        if self.purchase_order_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'purchase.order',
+                'view_mode': 'form',
+                'res_id': self.purchase_order_id.id,
+            }
+        if not self.salesperson_id.partner_id:
+            raise UserError(_(
+                'The salesperson "%s" has no related contact to use as the Purchase '
+                'Order vendor.'
+            ) % self.salesperson_id.name)
+        if self.commission_collected <= 0:
+            raise UserError(_(
+                'Nothing is payable yet for this period: Commission Collected is %s. '
+                'Pending Collection becomes payable once the customer invoices are paid.'
+            ) % self.commission_collected)
+
+        product = self._get_commission_payout_product()
+        order = self.env['purchase.order'].create({
+            'partner_id': self.salesperson_id.partner_id.id,
+            'currency_id': self.currency_id.id,
+            'company_id': self.company_id.id,
+            'origin': self.name,
+            'order_line': [(0, 0, {
+                'product_id': product.id,
+                'name': _('Sales commission payout — %s') % self.name,
+                'product_qty': 1,
+                'product_uom': product.uom_id.id,
+                'price_unit': self.commission_collected,
+            })],
+        })
+        self.purchase_order_id = order
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'purchase.order',
+            'view_mode': 'form',
+            'res_id': order.id,
+        }
 
     # ------------------------------------------------------------------
     # Automatic triggers
