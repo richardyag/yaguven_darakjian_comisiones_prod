@@ -362,7 +362,7 @@ class YaguvenCommissionTarget(models.Model):
                 'product_id': product.id,
                 'name': _('Sales commission payout — %s') % self.name,
                 'product_qty': 1,
-                'product_uom': product.uom_id.id,
+                'product_uom_id': product.uom_id.id,
                 'price_unit': self.commission_collected,
             })],
         })
