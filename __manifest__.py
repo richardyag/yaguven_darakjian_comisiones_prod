@@ -24,7 +24,7 @@ module (sale_commission).
     'maintainer': 'Yagüven C.G.',
     'website': 'https://github.com/Darakjian/yaguven_darakjian_comisiones',
     'category': 'Sales/Commissions',
-    'version': '19.0.1.3.1',
+    'version': '19.0.1.3.2',
     'license': 'LGPL-3',
     'depends': [
         'base',
