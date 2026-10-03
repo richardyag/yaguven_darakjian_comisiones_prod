@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <list default_order="year desc, month desc, salesperson_id">
                 <field name="salesperson_id"/>
-                <field name="year"/>
+                <field name="year" options="{'enable_formatting': false}"/>
                 <field name="month"/>
                 <field name="objective_usd" widget="monetary"/>
                 <field name="volume_total" widget="monetary" sum="Volume"/>
@@ -53,7 +53,7 @@
                     <group>
                         <group string="Input (Janel)">
                             <field name="salesperson_id" options="{'no_create_edit': True}"/>
-                            <field name="year"/>
+                            <field name="year" options="{'enable_formatting': false}"/>
                             <field name="month"/>
                             <field name="objective_usd" widget="monetary"/>
                             <field name="currency_id" invisible="1"/>
