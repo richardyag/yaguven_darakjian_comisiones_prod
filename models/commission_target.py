@@ -298,13 +298,20 @@ class YaguvenCommissionTarget(models.Model):
         Mirrors ``_move_snapshot``: volume is the net of every product line, cost comes
         from the product's standard_price. A POS order only reaches 'paid'/'done' once
         the register has collected full payment, so it is always counted as collected.
+
+        ``price_subtotal`` is read as a magnitude and re-signed from ``qty`` rather than
+        trusted as-is: a refund line (negative qty) can carry a stale positive
+        price_subtotal if it was never recomputed after being written directly (e.g. a
+        refund created by anything other than the normal POS refund flow), which would
+        otherwise make a return add to volume instead of subtracting from it.
         """
         self.ensure_one()
         company = self.company_id
         net = 0.0
         cost = 0.0
         for line in order.lines:
-            net += line.price_subtotal
+            sign = -1.0 if line.qty < 0 else 1.0
+            net += abs(line.price_subtotal) * sign
             if line.product_id:
                 cost += line.product_id.with_company(company).standard_price * line.qty
         if order.currency_id and order.currency_id != company.currency_id:

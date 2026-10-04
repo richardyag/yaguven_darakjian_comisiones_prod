@@ -20,7 +20,7 @@ account.payment, pos.order) as a read-only datasource and writes only to its own
 (yaguven.commission.*). It neither depends on nor inherits from Odoo's own commission
 module (sale_commission).
 
-Commission Source setting (19.0.1.4.0): "Invoiced sales only" (default) keeps the
+Commission Source setting (19.0.1.4.1): "Invoiced sales only" (default) keeps the
 original behavior — a sale with no invoice earns no commission. "All sales" also counts
 POS orders that were paid but never invoiced, attributed to whoever rang them up, so a
 salesperson is never penalized for a sale nobody got around to invoicing. A POS order is
@@ -30,7 +30,7 @@ counted once: as a POS order while uninvoiced, as an invoice from the moment it 
     'maintainer': 'Yagüven C.G.',
     'website': 'https://github.com/Darakjian/yaguven_darakjian_comisiones',
     'category': 'Sales/Commissions',
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.4.1',
     'license': 'LGPL-3',
     'depends': [
         'base',
