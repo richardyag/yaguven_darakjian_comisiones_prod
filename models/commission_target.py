@@ -333,18 +333,37 @@ class YaguvenCommissionTarget(models.Model):
             'is_collected': move.payment_state in COLLECTED_STATES,
         }
 
+    def _pos_order_cost_from_stock(self, order):
+        """Real cost of this uninvoiced POS order's stock movement — not an estimate.
+
+        This store's accounting only posts COGS in one lump sum per closed POS session
+        (every uninvoiced order in it summed together), with no stock.valuation.layer
+        model to read a per-order figure from either. But ``stock.move.value`` on each
+        order's own picking already holds the exact valuation of that specific movement
+        — verified against a real closed session's posted COGS line, to the cent. The
+        move carries no sign of its own, so direction is read off the Customer location:
+        stock leaving TO the customer is a cost (a sale), stock coming back FROM the
+        customer reverses it (a return) — the same convention this store's own inventory
+        valuation uses.
+        """
+        total = 0.0
+        moves = order.picking_ids.move_ids.filtered(lambda m: m.state == 'done')
+        for move in moves:
+            if move.location_dest_id.usage == 'customer':
+                total += move.value
+            elif move.location_id.usage == 'customer':
+                total -= move.value
+        return total
+
     def _pos_order_snapshot(self, order):
         """Snapshot of an uninvoiced POS order's net volume and cost, company currency.
 
-        Volume is the net of every product line. Cost, unlike ``_move_snapshot``, is
-        ALWAYS the product's standard_price estimate, never the real posted COGS: this
-        store's inventory valuation posts one combined COGS line per closed POS SESSION
-        (every uninvoiced order in it summed together, no per-order or per-product
-        breakdown, and no stock.valuation.layer model to fall back on either) — there is
-        no real per-order cost to read until the order is invoiced, at which point its
-        line is replaced by an invoice-sourced one that does use the real COGS. A POS
-        order only reaches 'paid'/'done' once the register has collected full payment,
-        so it is always counted as collected.
+        Volume is the net of every product line. Cost is the order's real stock
+        movement value (see ``_pos_order_cost_from_stock``) — falls back to the
+        product's standard_price estimate only if the order has no done stock move at
+        all to read (e.g. a non-stockable line). A POS order only reaches 'paid'/'done'
+        once the register has collected full payment, so it is always counted as
+        collected.
 
         ``price_subtotal`` is read as a magnitude and re-signed from ``qty`` rather than
         trusted as-is: a refund line (negative qty) can carry a stale positive
@@ -355,12 +374,16 @@ class YaguvenCommissionTarget(models.Model):
         self.ensure_one()
         company = self.company_id
         net = 0.0
-        cost = 0.0
         for line in order.lines:
             sign = -1.0 if line.qty < 0 else 1.0
             net += abs(line.price_subtotal) * sign
-            if line.product_id:
-                cost += line.product_id.with_company(company).standard_price * line.qty
+        if order.picking_ids.move_ids.filtered(lambda m: m.state == 'done'):
+            cost = self._pos_order_cost_from_stock(order)
+        else:
+            cost = 0.0
+            for line in order.lines:
+                if line.product_id:
+                    cost += line.product_id.with_company(company).standard_price * line.qty
         if order.currency_id and order.currency_id != company.currency_id:
             rate_date = order.date_order.date() if order.date_order else fields.Date.context_today(self)
             net_company = order.currency_id._convert(net, company.currency_id, company, rate_date)

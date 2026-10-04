@@ -26,17 +26,21 @@ POS orders that were paid but never invoiced, attributed to whoever rang them up
 salesperson is never penalized for a sale nobody got around to invoicing. A POS order is
 counted once: as a POS order while uninvoiced, as an invoice from the moment it is.
 
-Real COGS for invoices (19.0.1.5.2): an invoice's margin now uses the Cost of Goods Sold
+Real COGS for invoices (19.0.1.5.0): an invoice's margin now uses the Cost of Goods Sold
 actually posted on that invoice, not an estimate off today's standard_price — the two
-can disagree once a product's cost changes after the sale. Uninvoiced POS orders still
-use the standard_price estimate: this store only posts COGS in one lump sum per closed
-POS session, with no per-order breakdown to read instead.
+can disagree once a product's cost changes after the sale.
+
+Real cost for uninvoiced POS orders (19.0.1.6.0): this store's accounting only posts
+COGS in one lump sum per closed POS session, with no per-order breakdown — but each
+order's own stock.move already carries the exact valuation of its own movement. Margin
+for an uninvoiced POS order now reads that instead of estimating off standard_price;
+verified to reconcile to the cent against a real closed session's posted COGS.
 """,
     'author': 'Yagüven C.G.',
     'maintainer': 'Yagüven C.G.',
     'website': 'https://github.com/Darakjian/yaguven_darakjian_comisiones',
     'category': 'Sales/Commissions',
-    'version': '19.0.1.5.2',
+    'version': '19.0.1.6.0',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -45,6 +49,7 @@ POS session, with no per-order breakdown to read instead.
         'product',
         'purchase',
         'point_of_sale',
+        'stock',
     ],
     'data': [
         'security/ir.model.access.csv',
