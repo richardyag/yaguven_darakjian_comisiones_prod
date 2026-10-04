@@ -46,6 +46,7 @@ class YaguvenCommissionTarget(models.Model):
         required=True,
         default=lambda self: fields.Date.context_today(self).year,
         tracking=True,
+        aggregator=None,
     )
     month = fields.Selection(
         MONTHS,
