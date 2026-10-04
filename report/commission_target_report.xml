@@ -50,11 +50,11 @@
                         </tbody>
                     </table>
 
-                    <h4 class="mt-4">Detail by Invoice</h4>
+                    <h4 class="mt-4">Detail by Sale</h4>
                     <table class="table table-sm">
                         <thead>
                             <tr>
-                                <th>Invoice</th>
+                                <th>Document</th>
                                 <th>Date</th>
                                 <th class="text-end">Volume</th>
                                 <th class="text-end">Margin</th>

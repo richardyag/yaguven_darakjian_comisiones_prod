@@ -12,6 +12,7 @@
                 <field name="pct_target"/>
                 <field name="pct_super"/>
                 <field name="super_threshold_pct"/>
+                <field name="source_mode"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -37,6 +38,11 @@
                             <field name="pct_target"/>
                             <field name="pct_super"/>
                             <field name="super_threshold_pct"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Source">
+                            <field name="source_mode" widget="radio"/>
                         </group>
                     </group>
                     <div class="text-muted">

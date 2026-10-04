@@ -77,10 +77,12 @@
                         </group>
                     </group>
                     <notebook>
-                        <page string="Detail by Invoice" name="lines">
+                        <page string="Detail by Sale" name="lines">
                             <field name="line_ids" readonly="1">
-                                <list default_order="invoice_date, move_id">
-                                    <field name="move_id"/>
+                                <list default_order="invoice_date, id">
+                                    <field name="move_name" string="Document"/>
+                                    <field name="source_type" widget="badge"
+                                           decoration-warning="source_type == 'pos_order'"/>
                                     <field name="invoice_date"/>
                                     <field name="move_type" optional="hide"/>
                                     <field name="volume" widget="monetary" sum="Volume"/>

@@ -65,6 +65,22 @@ class YaguvenCommissionConfig(models.Model):
              'E.g. 125 => the upper tier starts at 1.25 x goal.',
         tracking=True,
     )
+    source_mode = fields.Selection(
+        [
+            ('invoiced', 'Invoiced sales only'),
+            ('all_sales', 'All sales (invoiced + POS not yet invoiced)'),
+        ],
+        string='Commission Source',
+        default='invoiced',
+        required=True,
+        tracking=True,
+        help="Invoiced sales only: counts posted customer invoices/credit notes, same "
+             "as before — a sale with no invoice earns no commission. All sales: also "
+             "counts POS orders that were paid but never invoiced, attributed to "
+             "whichever salesperson rang them up, so the choice to invoice or not "
+             "never changes what a salesperson is owed. A POS order that later gets "
+             "invoiced is counted once, as the invoice — never twice.",
+    )
 
     # ------------------------------------------------------------------
     # Constraints

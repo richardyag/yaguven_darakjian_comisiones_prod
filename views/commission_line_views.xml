@@ -5,9 +5,11 @@
         <field name="name">yaguven.commission.line.list</field>
         <field name="model">yaguven.commission.line</field>
         <field name="arch" type="xml">
-            <list default_order="invoice_date desc, move_id" create="false">
+            <list default_order="invoice_date desc, id" create="false">
                 <field name="salesperson_id"/>
-                <field name="move_id"/>
+                <field name="move_name"/>
+                <field name="source_type" widget="badge"
+                       decoration-warning="source_type == 'pos_order'"/>
                 <field name="invoice_date"/>
                 <field name="volume" widget="monetary" sum="Volume"/>
                 <field name="cost_total" widget="monetary" sum="Cost"/>
@@ -31,9 +33,11 @@
                         <group string="Source">
                             <field name="target_id"/>
                             <field name="salesperson_id"/>
-                            <field name="move_id"/>
+                            <field name="source_type"/>
+                            <field name="move_id" invisible="source_type != 'invoice'"/>
+                            <field name="pos_order_id" invisible="source_type != 'pos_order'"/>
                             <field name="invoice_date"/>
-                            <field name="move_type"/>
+                            <field name="move_type" invisible="source_type != 'invoice'"/>
                         </group>
                         <group string="Calculation">
                             <field name="volume" widget="monetary"/>
@@ -57,7 +61,12 @@
         <field name="arch" type="xml">
             <search>
                 <field name="salesperson_id"/>
-                <field name="move_id"/>
+                <field name="move_name" string="Document"/>
+                <filter name="filter_invoice" string="Invoice"
+                        domain="[('source_type', '=', 'invoice')]"/>
+                <filter name="filter_pos_order" string="POS Order (not invoiced)"
+                        domain="[('source_type', '=', 'pos_order')]"/>
+                <separator/>
                 <filter name="filter_collected" string="Collected"
                         domain="[('is_collected', '=', True)]"/>
                 <filter name="filter_not_collected" string="Not Collected"
@@ -65,6 +74,8 @@
                 <group>
                     <filter name="groupby_salesperson" string="Salesperson"
                             context="{'group_by': 'salesperson_id'}"/>
+                    <filter name="groupby_source" string="Source"
+                            context="{'group_by': 'source_type'}"/>
                     <filter name="groupby_collected" string="Collection"
                             context="{'group_by': 'is_collected'}"/>
                 </group>

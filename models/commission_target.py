@@ -207,6 +207,30 @@ class YaguvenCommissionTarget(models.Model):
             ('invoice_date', '<=', date_to),
         ])
 
+    def _order_salesperson(self, order):
+        """Who actually rang up a POS order: the PIN cashier if known, else the
+        session owner — same preference yaguven_darakjian_pos_nav already applies when
+        it sets an invoice's invoice_user_id from this same order."""
+        return order.employee_id.user_id or order.user_id
+
+    def _find_uninvoiced_pos_orders(self, date_from, date_to):
+        """Paid POS orders for the salesperson in the period that were never invoiced.
+
+        Only relevant when config_id.source_mode == 'all_sales'. Fetched company- and
+        period-wide, then filtered in Python by attributed salesperson: the attribution
+        can come from the PIN cashier (employee_id.user_id), which no plain ORM domain
+        on pos.order can express directly.
+        """
+        self.ensure_one()
+        candidates = self.env['pos.order'].search([
+            ('company_id', '=', self.company_id.id),
+            ('state', 'in', ('paid', 'done', 'invoiced')),
+            ('account_move', '=', False),
+            ('date_order', '>=', date_from),
+            ('date_order', '<=', date_to),
+        ])
+        return candidates.filtered(lambda o: self._order_salesperson(o) == self.salesperson_id)
+
     def _product_from_line_name(self, name, cache=None):
         """Recover the product from the [code] embedded in the line name.
 
@@ -268,19 +292,50 @@ class YaguvenCommissionTarget(models.Model):
             'is_collected': move.payment_state in COLLECTED_STATES,
         }
 
+    def _pos_order_snapshot(self, order):
+        """Snapshot of an uninvoiced POS order's net volume and cost, company currency.
+
+        Mirrors ``_move_snapshot``: volume is the net of every product line, cost comes
+        from the product's standard_price. A POS order only reaches 'paid'/'done' once
+        the register has collected full payment, so it is always counted as collected.
+        """
+        self.ensure_one()
+        company = self.company_id
+        net = 0.0
+        cost = 0.0
+        for line in order.lines:
+            net += line.price_subtotal
+            if line.product_id:
+                cost += line.product_id.with_company(company).standard_price * line.qty
+        if order.currency_id and order.currency_id != company.currency_id:
+            rate_date = order.date_order.date() if order.date_order else fields.Date.context_today(self)
+            net_company = order.currency_id._convert(net, company.currency_id, company, rate_date)
+        else:
+            net_company = net
+        return {
+            'volume': net_company,
+            'cost_total': cost,
+            'is_collected': True,
+        }
+
     def _recompute_one(self):
         self.ensure_one()
         config = self.config_id or self.env['yaguven.commission.config']._get_for_company(self.company_id)
         date_from, date_to = self._period_range()
         moves = self._find_moves(date_from, date_to)
+        pos_orders = self.env['pos.order']
+        if config.source_mode == 'all_sales':
+            pos_orders = self._find_uninvoiced_pos_orders(date_from, date_to)
 
-        existing = {line.move_id.id: line for line in self.line_ids}
-        seen = set()
+        existing_by_move = {line.move_id.id: line for line in self.line_ids if line.move_id}
+        existing_by_order = {line.pos_order_id.id: line for line in self.line_ids if line.pos_order_id}
+        seen_moves = set()
+        seen_orders = set()
         code_cache = {}
         for move in moves:
-            seen.add(move.id)
+            seen_moves.add(move.id)
             snap = self._move_snapshot(move, code_cache)
-            line = existing.get(move.id)
+            line = existing_by_move.get(move.id)
             if line:
                 # Volume and cost stay frozen; only the collection state is refreshed.
                 line.is_collected = snap['is_collected']
@@ -292,8 +347,24 @@ class YaguvenCommissionTarget(models.Model):
                     'cost_total': snap['cost_total'],
                     'is_collected': snap['is_collected'],
                 })
-        # Dropped: invoices that stopped qualifying (unposted, cancelled or reassigned).
-        stale = self.line_ids.filtered(lambda l: l.move_id.id not in seen)
+        for order in pos_orders:
+            seen_orders.add(order.id)
+            snap = self._pos_order_snapshot(order)
+            line = existing_by_order.get(order.id)
+            if not line:
+                self.env['yaguven.commission.line'].create({
+                    'target_id': self.id,
+                    'pos_order_id': order.id,
+                    'volume': snap['volume'],
+                    'cost_total': snap['cost_total'],
+                    'is_collected': snap['is_collected'],
+                })
+        # Dropped: sales that stopped qualifying (unposted/cancelled/reassigned moves,
+        # or POS orders that got invoiced meanwhile — picked up as a move instead).
+        stale = self.line_ids.filtered(
+            lambda l: (l.move_id and l.move_id.id not in seen_moves)
+            or (l.pos_order_id and l.pos_order_id.id not in seen_orders)
+        )
         stale.unlink()
 
         # Tier from the month volume, one single rate applied to every line (cliff).
