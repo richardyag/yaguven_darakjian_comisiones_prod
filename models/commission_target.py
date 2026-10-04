@@ -1,6 +1,6 @@
 import calendar
 import re
-from datetime import date
+from datetime import date, datetime, time
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -220,14 +220,23 @@ class YaguvenCommissionTarget(models.Model):
         period-wide, then filtered in Python by attributed salesperson: the attribution
         can come from the PIN cashier (employee_id.user_id), which no plain ORM domain
         on pos.order can express directly.
+
+        date_order is a Datetime field; comparing it against bare date objects lets Odoo
+        widen the bounds by the acting user's timezone (UTC for a cron, whatever the
+        logged-in user has otherwise) — not deterministic, and it can silently drop
+        orders from the first or last hours of the period. Built as explicit UTC
+        datetimes instead, matching how date_order is actually stored, so the period
+        boundary never shifts depending on who triggers the recompute.
         """
         self.ensure_one()
+        datetime_from = datetime.combine(date_from, time.min)
+        datetime_to = datetime.combine(date_to, time.max)
         candidates = self.env['pos.order'].search([
             ('company_id', '=', self.company_id.id),
             ('state', 'in', ('paid', 'done', 'invoiced')),
             ('account_move', '=', False),
-            ('date_order', '>=', date_from),
-            ('date_order', '<=', date_to),
+            ('date_order', '>=', datetime_from),
+            ('date_order', '<=', datetime_to),
         ])
         return candidates.filtered(lambda o: self._order_salesperson(o) == self.salesperson_id)
 

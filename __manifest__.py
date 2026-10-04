@@ -26,7 +26,7 @@ POS orders that were paid but never invoiced, attributed to whoever rang them up
 salesperson is never penalized for a sale nobody got around to invoicing. A POS order is
 counted once: as a POS order while uninvoiced, as an invoice from the moment it is.
 
-Real COGS for invoices (19.0.1.5.0): an invoice's margin now uses the Cost of Goods Sold
+Real COGS for invoices (19.0.1.5.1): an invoice's margin now uses the Cost of Goods Sold
 actually posted on that invoice, not an estimate off today's standard_price — the two
 can disagree once a product's cost changes after the sale. Uninvoiced POS orders still
 use the standard_price estimate: this store only posts COGS in one lump sum per closed
@@ -36,7 +36,7 @@ POS session, with no per-order breakdown to read instead.
     'maintainer': 'Yagüven C.G.',
     'website': 'https://github.com/Darakjian/yaguven_darakjian_comisiones',
     'category': 'Sales/Commissions',
-    'version': '19.0.1.5.0',
+    'version': '19.0.1.5.1',
     'license': 'LGPL-3',
     'depends': [
         'base',
