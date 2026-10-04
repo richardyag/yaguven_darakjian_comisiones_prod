@@ -20,17 +20,23 @@ account.payment, pos.order) as a read-only datasource and writes only to its own
 (yaguven.commission.*). It neither depends on nor inherits from Odoo's own commission
 module (sale_commission).
 
-Commission Source setting (19.0.1.4.1): "Invoiced sales only" (default) keeps the
+Commission Source setting (19.0.1.4.0): "Invoiced sales only" (default) keeps the
 original behavior — a sale with no invoice earns no commission. "All sales" also counts
 POS orders that were paid but never invoiced, attributed to whoever rang them up, so a
 salesperson is never penalized for a sale nobody got around to invoicing. A POS order is
 counted once: as a POS order while uninvoiced, as an invoice from the moment it is.
+
+Real COGS for invoices (19.0.1.5.0): an invoice's margin now uses the Cost of Goods Sold
+actually posted on that invoice, not an estimate off today's standard_price — the two
+can disagree once a product's cost changes after the sale. Uninvoiced POS orders still
+use the standard_price estimate: this store only posts COGS in one lump sum per closed
+POS session, with no per-order breakdown to read instead.
 """,
     'author': 'Yagüven C.G.',
     'maintainer': 'Yagüven C.G.',
     'website': 'https://github.com/Darakjian/yaguven_darakjian_comisiones',
     'category': 'Sales/Commissions',
-    'version': '19.0.1.4.1',
+    'version': '19.0.1.5.0',
     'license': 'LGPL-3',
     'depends': [
         'base',

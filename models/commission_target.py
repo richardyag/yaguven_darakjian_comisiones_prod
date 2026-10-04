@@ -257,28 +257,59 @@ class YaguvenCommissionTarget(models.Model):
             cache[code] = prod
         return prod
 
+    def _move_cost_from_cogs(self, move):
+        """Real posted Cost of Goods Sold for this move, read straight from accounting.
+
+        This store posts the COGS entry on the SAME move as the invoice (one expense
+        line per product line, in the same currency/sign as the invoice itself) rather
+        than on a separate delivery-triggered valuation move — confirmed by inspecting
+        real invoices and credit notes: a return's COGS line already comes back negative
+        on its own, no re-signing needed. Returns None when the move has no such line at
+        all (e.g. older migrated invoices with no COGS ever posted), so the caller can
+        fall back to the standard_price estimate instead of silently reporting 0 cost.
+        """
+        cogs_lines = move.line_ids.filtered(
+            lambda l: l.account_id.account_type == 'expense_direct_cost'
+        )
+        if not cogs_lines:
+            return None
+        return sum(cogs_lines.mapped('balance'))
+
+    def _move_cost_from_standard_price(self, move, code_cache=None):
+        """Fallback estimate: product standard_price x quantity, today's cost — used
+        only when the move has no real COGS line to read (see _move_cost_from_cogs)."""
+        company = self.company_id
+        sign = -1.0 if move.move_type == 'out_refund' else 1.0
+        cost_total = 0.0
+        for line in move.invoice_line_ids:
+            if line.display_type and line.display_type != 'product':
+                continue
+            product = line.product_id or self._product_from_line_name(line.name, code_cache)
+            if product:
+                cost_total += product.with_company(company).standard_price * line.quantity
+        return sign * cost_total
+
     def _move_snapshot(self, move, code_cache=None):
         """Snapshot of the invoice's net volume and cost, in company currency.
 
         - Volume = the net of EVERY sale line (display_type='product'), linked to a
           product or not: this is the sales volume that decides the tier.
-        - Cost per line comes from the product's standard_price. When the line has no
-          product_id (migrated data), the product is recovered from the [code] in the
-          name. Unresolved lines cost 0, so they count as pure margin.
+        - Cost = the real Cost of Goods Sold posted on this move, when there is one;
+          the product's standard_price x quantity only as a fallback for moves with no
+          COGS line at all (see _move_cost_from_cogs).
         - Credit notes (out_refund) come in with a negative sign.
         """
         self.ensure_one()
         company = self.company_id
         sign = -1.0 if move.move_type == 'out_refund' else 1.0
         net_move_ccy = 0.0
-        cost_total = 0.0
         for line in move.invoice_line_ids:
             if line.display_type and line.display_type != 'product':
                 continue
             net_move_ccy += line.price_subtotal
-            product = line.product_id or self._product_from_line_name(line.name, code_cache)
-            if product:
-                cost_total += product.with_company(company).standard_price * line.quantity
+        cost_total = self._move_cost_from_cogs(move)
+        if cost_total is None:
+            cost_total = self._move_cost_from_standard_price(move, code_cache)
         # Net converted to company currency (USD); the cost is already in it.
         if move.currency_id and move.currency_id != company.currency_id:
             rate_date = move.invoice_date or fields.Date.context_today(self)
@@ -288,16 +319,22 @@ class YaguvenCommissionTarget(models.Model):
             net_company = net_move_ccy
         return {
             'volume': sign * net_company,
-            'cost_total': sign * cost_total,
+            'cost_total': cost_total,
             'is_collected': move.payment_state in COLLECTED_STATES,
         }
 
     def _pos_order_snapshot(self, order):
         """Snapshot of an uninvoiced POS order's net volume and cost, company currency.
 
-        Mirrors ``_move_snapshot``: volume is the net of every product line, cost comes
-        from the product's standard_price. A POS order only reaches 'paid'/'done' once
-        the register has collected full payment, so it is always counted as collected.
+        Volume is the net of every product line. Cost, unlike ``_move_snapshot``, is
+        ALWAYS the product's standard_price estimate, never the real posted COGS: this
+        store's inventory valuation posts one combined COGS line per closed POS SESSION
+        (every uninvoiced order in it summed together, no per-order or per-product
+        breakdown, and no stock.valuation.layer model to fall back on either) — there is
+        no real per-order cost to read until the order is invoiced, at which point its
+        line is replaced by an invoice-sourced one that does use the real COGS. A POS
+        order only reaches 'paid'/'done' once the register has collected full payment,
+        so it is always counted as collected.
 
         ``price_subtotal`` is read as a magnitude and re-signed from ``qty`` rather than
         trusted as-is: a refund line (negative qty) can carry a stale positive
